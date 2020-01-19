@@ -24,7 +24,7 @@ object SimpleSpark extends App {
     // Turn off logging
     Logger.getLogger("org").setLevel(Level.OFF)
     Logger.getLogger("akka").setLevel(Level.OFF)
-
+/*
     //------------------------------------------------------------------------------------------------------------------
     // Lamda basics (for Scala)
     //------------------------------------------------------------------------------------------------------------------
@@ -52,7 +52,7 @@ object SimpleSpark extends App {
     println(smallListOfNumbers.map(squareAndAddFunction))
     println(smallListOfNumbers.map(i => i * 2 + 0.5)) // anonymous function; compiler can infers types
     println(smallListOfNumbers.map(_ * 2 + 0.5)) // syntactic sugar: '_' maps to first (second, third, ...) parameter
-
+*/
     //------------------------------------------------------------------------------------------------------------------
     // Setting up a Spark Session
     //------------------------------------------------------------------------------------------------------------------
@@ -60,13 +60,14 @@ object SimpleSpark extends App {
     // Create a SparkSession to work with Spark
     val sparkBuilder = SparkSession
       .builder()
-      .appName("SparkTutorial")
+      .appName("Sindy")
       .master("local[4]") // local, with 4 worker cores
     val spark = sparkBuilder.getOrCreate()
 
     // Set the default number of shuffle partitions (default is 200, which is too high for local deployment)
     spark.conf.set("spark.sql.shuffle.partitions", "8") //
 
+    /*
     // Importing implicit encoders for standard library classes and tuples that are used as Dataset types
     import spark.implicits._
 
@@ -430,14 +431,22 @@ object SimpleSpark extends App {
         .toDF("ID", "Substring")
         .show(200)
     }
-
+*/
     //------------------------------------------------------------------------------------------------------------------
     // Inclusion Dependency Discovery (Homework)
     //------------------------------------------------------------------------------------------------------------------
 
+    def time[R](block: => R): R = {
+      val t0 = System.currentTimeMillis()
+      val result = block
+      val t1 = System.currentTimeMillis()
+      println(s"Execution: ${t1 - t0} ms")
+      result
+    }
+
     val inputs = List("region", "nation", "supplier", "customer", "part", "lineitem", "orders")
       .map(name => s"data/TPCH/tpch_$name.csv")
 
-    //time {Sindy.discoverINDs(inputs, spark)}
+    time { Sindy.discoverINDs(inputs, spark) }
   }
 }

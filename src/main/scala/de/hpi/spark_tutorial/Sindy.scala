@@ -32,12 +32,11 @@ object Sindy {
       distinctColumnValues.reduce((df1, df2) => df1.union(df2))
     }).reduce((df1, df2) => df1.union(df2)).as[(String, String)]
 
-    // TODO: Fix wrong col name of attribute
-    // TOOD: Look at partitioning
+    // TODO: Look at partitioning
 
     // Attribute sets contain
-    val groupedAttributes = cells.groupBy("R_REGIONKEY").agg(collect_set(columnName))
-    val attributeSets = groupedAttributes.select(groupedAttributes("collect_set(col)"))
+    val groupedAttributes = cells.groupBy(cells.columns(0)).agg(collect_set(columnName))
+    val attributeSets = groupedAttributes.select(groupedAttributes.columns(1))
 
     // Build inclusion list
     val inclusionLists = attributeSets.flatMap(row => {
@@ -45,9 +44,14 @@ object Sindy {
       // Generate set e.g [a,b] => [a, [b]], [b, [a]] and filter out the empty ones
       attributeSet.map(attribute => (attribute, attributeSet.filter(_ != attribute)))
         .filter(inclusionList => inclusionList._2.nonEmpty)
-    })
+    }).as[(String, Seq[String])]
 
-    val results = inclusionLists.distinct().take(inclusionLists.count().toInt)
+    // Build result list
+    val results = inclusionLists
+      .groupBy(inclusionLists.columns(0))
+      .agg(collect_set(inclusionLists.columns(1)))
+      .as[(String, Seq[Seq[String]])]
+      .map((inclusion) => (inclusion._1, inclusion._2.flatten.distinct))
 
     results.foreach(result => println(s"${result._1} < ${result._2.mkString(",")}"))
   }

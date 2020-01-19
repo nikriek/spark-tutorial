@@ -23,36 +23,42 @@ object Sindy {
 
     import spark.implicits._
 
-    // Cells contains a dataframe of ALL distinct values per column + column name
+    // Cells contains a dataframe of ALL distinct values per column + attribute name
     val cells = dataframes.map(df => {
       // Get the columns names and use them to select respective columns from the dataframe
       val distinctColumnValues = df.columns
         .map(col => df.select(df(col)).distinct().withColumn(columnName, lit(col)))
       // Merge the distinct (column value, column name)-dataframes
       distinctColumnValues.reduce((df1, df2) => df1.union(df2))
-    }).reduce((df1, df2) => df1.union(df2)).as[(String, String)]
+    }).reduce((df1, df2) => df1.union(df2))
+      .as[(String, String)]
+
 
     // TODO: Look at partitioning
 
-    // Attribute sets contain
-    val groupedAttributes = cells.groupBy(cells.columns(0)).agg(collect_set(columnName))
+    // Attribute sets are grouping together attributes that have the same value in the column
+    val groupedAttributes = cells
+      .groupBy(cells.columns(0)).agg(collect_set(columnName))
     val attributeSets = groupedAttributes.select(groupedAttributes.columns(1))
 
-    // Build inclusion list
-    val inclusionLists = attributeSets.flatMap(row => {
-      val attributeSet = row.getAs[Seq[String]](0)
-      // Generate set e.g [a,b] => [a, [b]], [b, [a]] and filter out the empty ones
-      attributeSet.map(attribute => (attribute, attributeSet.filter(_ != attribute)))
-        .filter(inclusionList => inclusionList._2.nonEmpty)
-    }).as[(String, Seq[String])]
+    // Build inclusion list from attribute sets
+    val inclusionLists = attributeSets
+      .flatMap(row => {
+        val attributeSet = row.getAs[Seq[String]](0)
+        // Generate set e.g [a,b] => [a, [b]], [b, [a]] and directly filter out the empty ones
+        attributeSet.map(attribute => (attribute, attributeSet.filter(_ != attribute)))
+          .filter(inclusionList => inclusionList._2.nonEmpty)
+      }).as[(String, Seq[String])]
 
-    // Build result list
+    // Build result list by collecting attribute sets and
+    // merging them using .flatten & .distinct
     val results = inclusionLists
       .groupBy(inclusionLists.columns(0))
       .agg(collect_set(inclusionLists.columns(1)))
       .as[(String, Seq[Seq[String]])]
-      .map((inclusion) => (inclusion._1, inclusion._2.flatten.distinct))
+      .map(inclusion => (inclusion._1, inclusion._2.flatten.distinct))
 
+    // Print results in desired format
     results.foreach(result => println(s"${result._1} < ${result._2.mkString(",")}"))
   }
 }

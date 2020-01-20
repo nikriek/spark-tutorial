@@ -3,16 +3,22 @@ package de.hpi.spark_tutorial
 import org.apache.spark.sql.{Dataset, Row, SparkSession}
 import org.apache.spark.sql.functions.{collect_set, lit}
 import org.apache.spark.sql.types.ArrayType
-
 import scala.collection.mutable
 
 object Sindy {
   val columnName = "col"
 
+  /**
+   * @param inputs List of file paths to CSV files
+   */
   def discoverINDs(inputs: List[String], spark: SparkSession): Unit = {
-    // Read csv data into Dataframes
-    // List[String] => List[DataFrame]
-    val dataframes = inputs.map(input => {
+
+    // For implicit conversions like converting RDDs to DataFrames
+    import spark.implicits._
+
+    // Create Dataframe from CSV files, one for each table.
+    // List[String filepath] => List[DataFrame table]
+    val tables = inputs.map(input => {
       spark.read
         .option("inferSchema", "true")
         .option("header", "true")
@@ -21,20 +27,23 @@ object Sindy {
         .csv(input)
     })
 
-    import spark.implicits._
+    // (1) Create cells from table data - DF with distinct (value, columnName)-tuples
 
-    // Cells contains a dataframe of ALL distinct values per column + attribute name
-    val cells = dataframes.map(df => {
-      // Get the columns names and use them to select respective columns from the dataframe
-      val distinctColumnValues = df.columns
-        .map(col => df.select(df(col)).distinct().withColumn(columnName, lit(col)))
-      // Merge the distinct (column value, column name)-dataframes
-      distinctColumnValues.reduce((df1, df2) => df1.union(df2))
-    }).reduce((df1, df2) => df1.union(df2))
+    val cells = tables.map(tableDF => { // for each table
+      tableDF.columns.map(columnName => { // for each column
+
+          tableDF.select(tableDF(columnName)) // new DF with values from given column
+            .distinct()  // filter duplicate values
+            .withColumn(columnName, lit(columnName)) // add "columnName"-column to DF
+
+      }).reduce((tuplesColumnA, tuplesColumnB) => tuplesColumnA.union(tuplesColumnB)) // Merge DFs (from columns)
+
+    }).reduce((tuplesTableA, tuplesTableB) => tuplesTableA.union(tuplesTableB)) // Merge DFs (from tables)
       .as[(String, String)]
 
-
     // TODO: Look at partitioning
+
+    // (2) Create attribute sets from  (value, columnName)-tuples
 
     // Attribute sets are grouping together attributes that have the same value in the column
     val groupedAttributes = cells

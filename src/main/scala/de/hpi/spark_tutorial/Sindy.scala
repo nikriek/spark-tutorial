@@ -51,12 +51,13 @@ object Sindy {
       }).as[(String, Seq[String])]
 
     // Build result list by collecting attribute sets and
-    // merging them using .flatten & .distinct
+    // merging them using the intersection
     val results = inclusionLists
       .groupBy(inclusionLists.columns(0))
       .agg(collect_set(inclusionLists.columns(1)))
       .as[(String, Seq[Seq[String]])]
-      .map(inclusion => (inclusion._1, inclusion._2.reduce((a,b) => a.intersect(b))))
+      .filter(inclusionList => inclusionList._2.exists(_.isEmpty))
+      .map(inclusion => (inclusion._1, inclusion._2.flatten.distinct))
 
     // Print results in desired format
     results.foreach(result => println(s"${result._1} < ${result._2.mkString(",")}"))

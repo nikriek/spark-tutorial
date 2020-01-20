@@ -3,5 +3,14 @@ Things to do after checking out and opening in intellij:
     Add scala SDK 2.11.11 (tested with this version, it has to be 2.11.x since this is the spark version)
     Add jdk 8
     add Framework support of Maven
-To build the project:
-    run mvn package
+To build the project, run
+
+```bash
+mvn package
+```
+
+To execute the project, run
+
+```bash
+ java -jar target/ByteShift-1.0.jar --cores 8 --path ../TPCH
+```   

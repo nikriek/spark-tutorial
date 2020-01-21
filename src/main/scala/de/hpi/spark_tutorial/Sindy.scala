@@ -9,6 +9,18 @@ import scala.collection.mutable
 object Sindy {
   val columnName = "col"
 
+  type AttributeSet = Seq[String]
+  type Attribute = String
+
+  case class Inclusion(subset: Attribute,
+                       supersets: AttributeSet)
+
+  case class InclusionList(subset: Attribute,
+                           inclusionSupersets: Seq[AttributeSet])
+
+  case class Value(value: String,
+                   attribute: Attribute)
+
   def discoverINDs(inputs: List[String], spark: SparkSession): Unit = {
     // Read csv data into Dataframes
     // List[String] => List[DataFrame]
@@ -31,8 +43,7 @@ object Sindy {
       // Merge the distinct (column value, column name)-dataframes
       distinctColumnValues.reduce((df1, df2) => df1.union(df2))
     }).reduce((df1, df2) => df1.union(df2))
-      .as[(String, String)]
-
+      .as[Value]
 
     // TODO: Look at partitioning
 
@@ -40,27 +51,26 @@ object Sindy {
     val groupedAttributes = cells
       .groupBy(cells.columns(0))
       .agg(collect_set(columnName))
-    val attributeSets = groupedAttributes.select(groupedAttributes.columns(1))
+    val attributeSets = groupedAttributes.select(groupedAttributes.columns(1)).as[Inclusion]
 
     // Build inclusion list from attribute sets
-    val inclusionLists = attributeSets
-      .flatMap(row => {
-        val attributeSet = row.getAs[Seq[String]](0)
+    val inclusionLists = attributeSets.flatMap(inclusion => {
         // Generate set e.g [a,b] => [a, [b]], [b, [a]]
-        attributeSet.map(attribute => (attribute, attributeSet.filter(_ != attribute)))
-      }).as[(String, Seq[String])]
+        inclusion.supersets.map(attribute => (attribute, inclusion.supersets.filter(_ != attribute)))
+      }).as[Inclusion]
 
     // Build result list by collecting attribute sets and
     // merging them using the intersection
     val results = inclusionLists
       .groupBy(inclusionLists.columns(0))
       .agg(collect_set(inclusionLists.columns(1)))
-      .as[(String, Seq[Seq[String]])]
-      .filter(inclusionList => inclusionList._2.exists(_.isEmpty))
-      .map(inclusion => (inclusion._1, inclusion._2.flatten.distinct))
+      .as[InclusionList]
+      .filter(inclusionList => inclusionList.inclusionSupersets.exists(_.isEmpty))
+      .map(inclusionList => (inclusionList.subset, inclusionList.inclusionSupersets.flatten.distinct))
+      .as[Inclusion]
 
     // Print results in desired format
-    results.foreach(result => println(s"${result._1} < ${result._2.mkString(",")}"))
+    results.foreach(result => println(s"${result.subset} < ${result.supersets.mkString(",")}"))
 
     /*
     C_CUSTKEY < P_PARTKEY

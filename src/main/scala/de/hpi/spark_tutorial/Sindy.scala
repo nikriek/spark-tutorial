@@ -41,46 +41,50 @@ object Sindy {
 
     // (1) Create cells from table data - DF with distinct (value, columnName)-tuples
 
-    val cells = tables.map(tableDF => { // for each table
+    tables.map(tableDF => { // for each table
       tableDF.columns.map(columnName => { // for each column
 
-          tableDF.select(tableDF(columnName)) // new DF with values from given column
-            .distinct()  // filter duplicate values
-            .withColumn(columnName, lit(columnName)) // add "columnName"-column to DF
+        tableDF.select(tableDF(columnName)) // new DF with values from given column
+          .distinct() // filter duplicate values
+          .withColumnRenamed(columnName, "column_value")
+          .withColumn("column_origin", lit(columnName)) // add "columnName"-column to DF
 
-      }).reduce((tuplesColumnA, tuplesColumnB) => tuplesColumnA.union(tuplesColumnB)) // Merge DFs (from columns)
+      }).foreach(df => df.show())
+    })
 
-    }).reduce((tuplesTableA, tuplesTableB) => tuplesTableA.union(tuplesTableB)) // Merge DFs (from tables)
-      .as[Value]
-
-    // TODO: Look at partitioning
-
-    // (2) Create attribute sets from  (value, columnName)-tuples
-
-    // Attribute sets are grouping together attributes that have the same value in the column
-    val groupedAttributes = cells
-      .groupBy(cells.columns(0))
-      .agg(collect_set(columnName))
-    val attributeSets = groupedAttributes.select(groupedAttributes.columns(1)).as[Inclusion]
-
-    // Build inclusion list from attribute sets
-    val inclusionLists = attributeSets.flatMap(inclusion => {
-        // Generate set e.g [a,b] => [a, [b]], [b, [a]]
-        inclusion.supersets.map(attribute => (attribute, inclusion.supersets.filter(_ != attribute)))
-      }).as[Inclusion]
-
-    // Build result list by collecting attribute sets and
-    // merging them using the intersection
-    val results = inclusionLists
-      .groupBy(inclusionLists.columns(0))
-      .agg(collect_set(inclusionLists.columns(1)))
-      .as[InclusionList]
-      .filter(inclusionList => inclusionList.inclusionSupersets.exists(_.isEmpty))
-      .map(inclusionList => (inclusionList.subset, inclusionList.inclusionSupersets.flatten.distinct))
-      .as[Inclusion]
-
-    // Print results in desired format
-    results.foreach(result => println(s"${result.subset} < ${result.supersets.mkString(",")}"))
+//        .reduce((tuplesColumnA, tuplesColumnB) => tuplesColumnA.union(tuplesColumnB)) // Merge DFs (from columns)
+//
+//    }).reduce((tuplesTableA, tuplesTableB) => tuplesTableA.union(tuplesTableB)) // Merge DFs (from tables)
+//      .as[Value]
+//
+//    // TODO: Look at partitioning
+//
+//    // (2) Create attribute sets from  (value, columnName)-tuples
+//
+//    // Attribute sets are grouping together attributes that have the same value in the column
+//    val groupedAttributes = cells
+//      .groupBy(cells.columns(0))
+//      .agg(collect_set(columnName))
+//    val attributeSets = groupedAttributes.select(groupedAttributes.columns(1)).as[Inclusion]
+//
+//    // Build inclusion list from attribute sets
+//    val inclusionLists = attributeSets.flatMap(inclusion => {
+//        // Generate set e.g [a,b] => [a, [b]], [b, [a]]
+//        inclusion.supersets.map(attribute => (attribute, inclusion.supersets.filter(_ != attribute)))
+//      }).as[Inclusion]
+//
+//    // Build result list by collecting attribute sets and
+//    // merging them using the intersection
+//    val results = inclusionLists
+//      .groupBy(inclusionLists.columns(0))
+//      .agg(collect_set(inclusionLists.columns(1)))
+//      .as[InclusionList]
+//      .filter(inclusionList => inclusionList.inclusionSupersets.exists(_.isEmpty))
+//      .map(inclusionList => (inclusionList.subset, inclusionList.inclusionSupersets.flatten.distinct))
+//      .as[Inclusion]
+//
+//    // Print results in desired format
+//    results.foreach(result => println(s"${result.subset} < ${result.supersets.mkString(",")}"))
 
     /*
     C_CUSTKEY < P_PARTKEY

@@ -1,7 +1,7 @@
 package de.hpi.spark_tutorial
 
 import org.apache.spark.sql.{Dataset, Row, SparkSession}
-import org.apache.spark.sql.functions.{collect_set, lit}
+import org.apache.spark.sql.functions.{collect_set, lit, explode}
 import org.apache.spark.sql.types.ArrayType
 import scala.collection.mutable
 
@@ -38,7 +38,6 @@ object Sindy {
     })
 
     // (1) Create cells from table data - DF with distinct (column_value, column_origin)-tuples
-
     val cells = tables.map(tableDF => { // for each table
       tableDF.columns.map(columnName => { // for each column
 
@@ -50,18 +49,18 @@ object Sindy {
       }).reduce((tuplesColumnA, tuplesColumnB) => tuplesColumnA.union(tuplesColumnB)) // Merge DFs (from columns)
     }).reduce((tuplesTableA, tuplesTableB) => tuplesTableA.union(tuplesTableB)) // Merge DFs (from tables)
 
-    // (2) Create attribute sets from (column_value, column_origin)-tuples
-
-    // An attribute set represent a tuple of the following form: (value, {column_name1, column_name2, ... })
+    // (2) Create attribute sets from cells
     val attributeSets = cells
       .groupBy(cells("column_value"))
-      .agg(collect_set("column_origin")).show()
+      .agg(collect_set("column_origin")).drop("column_value").as("attributeSet")
 
     // (3) Create inclusion lists
+    // Generate sets as follows: E.g [a,b] => [a, [b]], [b, [a]]
 
-//    // Build inclusion list from attribute sets
-//    val inclusionLists = attributeSets.flatMap(inclusion => {
-//        // Generate set e.g [a,b] => [a, [b]], [b, [a]]
+    val inclusionLists = attributeSets.select(explode("attributeSet")).show()
+
+
+//    val inclusionLists = attributeSets.flatMap(attributeSet => {
 //        inclusion.supersets.map(attribute => (attribute, inclusion.supersets.filter(_ != attribute)))
 //      }).as[Inclusion]
 //

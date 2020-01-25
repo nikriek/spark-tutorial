@@ -6,8 +6,6 @@ import org.apache.spark.sql.types.ArrayType
 import scala.collection.mutable
 
 object Sindy {
-  val columnName = "col"
-
   type AttributeSet = Seq[String]
   type Attribute = String
 
@@ -54,12 +52,13 @@ object Sindy {
 
     // (2) Create attribute sets from (column_value, column_origin)-tuples
 
-//    // Attribute sets are grouping together attributes that have the same value in the column
-//    val groupedAttributes = cells
-//      .groupBy(cells.columns(0))
-//      .agg(collect_set(columnName))
-//    val attributeSets = groupedAttributes.select(groupedAttributes.columns(1)).as[Inclusion]
-//
+    // An attribute set represent a tuple of the following form: (value, {column_name1, column_name2, ... })
+    val attributeSets = cells
+      .groupBy(cells("column_value"))
+      .agg(collect_set("column_origin")).show()
+
+    // (3) Create inclusion lists
+
 //    // Build inclusion list from attribute sets
 //    val inclusionLists = attributeSets.flatMap(inclusion => {
 //        // Generate set e.g [a,b] => [a, [b]], [b, [a]]

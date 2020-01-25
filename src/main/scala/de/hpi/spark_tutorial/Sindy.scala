@@ -39,9 +39,9 @@ object Sindy {
         .csv(input)
     })
 
-    // (1) Create cells from table data - DF with distinct (value, columnName)-tuples
+    // (1) Create cells from table data - DF with distinct (column_value, column_origin)-tuples
 
-    tables.map(tableDF => { // for each table
+    val cells = tables.map(tableDF => { // for each table
       tableDF.columns.map(columnName => { // for each column
 
         tableDF.select(tableDF(columnName)) // new DF with values from given column
@@ -49,18 +49,11 @@ object Sindy {
           .withColumnRenamed(columnName, "column_value")
           .withColumn("column_origin", lit(columnName)) // add "columnName"-column to DF
 
-      }).foreach(df => df.show())
-    })
+      }).reduce((tuplesColumnA, tuplesColumnB) => tuplesColumnA.union(tuplesColumnB)) // Merge DFs (from columns)
+    }).reduce((tuplesTableA, tuplesTableB) => tuplesTableA.union(tuplesTableB)) // Merge DFs (from tables)
 
-//        .reduce((tuplesColumnA, tuplesColumnB) => tuplesColumnA.union(tuplesColumnB)) // Merge DFs (from columns)
-//
-//    }).reduce((tuplesTableA, tuplesTableB) => tuplesTableA.union(tuplesTableB)) // Merge DFs (from tables)
-//      .as[Value]
-//
-//    // TODO: Look at partitioning
-//
-//    // (2) Create attribute sets from  (value, columnName)-tuples
-//
+    // (2) Create attribute sets from (column_value, column_origin)-tuples
+
 //    // Attribute sets are grouping together attributes that have the same value in the column
 //    val groupedAttributes = cells
 //      .groupBy(cells.columns(0))

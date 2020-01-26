@@ -57,7 +57,10 @@ object Sindy {
     // (3) Create inclusion lists
     // Generate sets as follows: E.g [a,b] => [a, [b]], [b, [a]]
 
-    val inclusionLists = attributeSets.select(explode("attributeSet")).show()
+    val inclusionLists = attributeSets.map(attributeSet => {
+      attributeSet.getAs[String]("column_origin").flatMap(
+        columnOrigin => { (columnOrigin, attributeSet)} )
+    }).show()
 
 
 //    val inclusionLists = attributeSets.flatMap(attributeSet => {

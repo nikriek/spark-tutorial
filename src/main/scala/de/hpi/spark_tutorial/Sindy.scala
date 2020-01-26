@@ -7,21 +7,23 @@ import org.apache.spark.sql.types.ArrayType
 import scala.collection.mutable
 
 object Sindy {
-  val columnName = "col"
+  val columnName = "attribute"
 
   type AttributeSet = Seq[String]
   type Attribute = String
 
-  case class Inclusion(subset: Attribute,
-                       supersets: AttributeSet)
+  case class Inclusion(attribute: Attribute,
+                       attributeSet: AttributeSet)
 
-  case class InclusionList(subset: Attribute,
-                           inclusionSupersets: Seq[AttributeSet])
+  case class InclusionList(attribute: Attribute,
+                           attributeSet: Seq[AttributeSet])
 
   case class Value(value: String,
                    attribute: Attribute)
 
   def discoverINDs(inputs: List[String], spark: SparkSession): Unit = {
+    // TODO: Look at partitioning
+
     // Read csv data into Dataframes
     // List[String] => List[DataFrame]
     val dataframes = inputs.map(input => {
@@ -43,34 +45,37 @@ object Sindy {
       // Merge the distinct (column value, column name)-dataframes
       distinctColumnValues.reduce((df1, df2) => df1.union(df2))
     }).reduce((df1, df2) => df1.union(df2))
-      .as[Value]
-
-    // TODO: Look at partitioning
 
     // Attribute sets are grouping together attributes that have the same value in the column
     val groupedAttributes = cells
       .groupBy(cells.columns(0))
-      .agg(collect_set(columnName))
-    val attributeSets = groupedAttributes.select(groupedAttributes.columns(1)).as[Inclusion]
+      .agg(collect_set(cells.columns(1)))
+
+    val attributeSets = groupedAttributes.select(groupedAttributes.columns(1)).as[AttributeSet]
 
     // Build inclusion list from attribute sets
     val inclusionLists = attributeSets.flatMap(inclusion => {
         // Generate set e.g [a,b] => [a, [b]], [b, [a]]
-        inclusion.supersets.map(attribute => (attribute, inclusion.supersets.filter(_ != attribute)))
-      }).as[Inclusion]
+        inclusion.map(attribute => (attribute, inclusion.filter(_ != attribute)))
+      }).filter(inclusion => inclusion._2.nonEmpty)
+      .toDF("attribute", "attributeSet")
+        .as[Inclusion]
 
     // Build result list by collecting attribute sets and
     // merging them using the intersection
     val results = inclusionLists
       .groupBy(inclusionLists.columns(0))
       .agg(collect_set(inclusionLists.columns(1)))
+      .toDF("attribute", "attributeSet")
       .as[InclusionList]
-      .filter(inclusionList => inclusionList.inclusionSupersets.exists(_.isEmpty))
-      .map(inclusionList => (inclusionList.subset, inclusionList.inclusionSupersets.flatten.distinct))
+      .map(inclusionList => (inclusionList.attribute, inclusionList.attributeSet.flatten.distinct))
+      .toDF("attribute", "attributeSet")
+      .orderBy(org.apache.spark.sql.functions.col("attribute").desc)
       .as[Inclusion]
 
+
     // Print results in desired format
-    results.foreach(result => println(s"${result.subset} < ${result.supersets.mkString(",")}"))
+    results.foreach(result => println(s"${result.attribute} < ${result.attributeSet.mkString(",")}"))
 
     /*
     C_CUSTKEY < P_PARTKEY

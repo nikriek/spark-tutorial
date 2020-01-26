@@ -38,7 +38,7 @@ object Sindy {
     })
 
     // (1) Create cells from table data - DF with distinct (column_value, column_origin)-tuples
-    val cells = tables.map(tableDF => { // for each table
+    val cellsDF = tables.map(tableDF => { // for each table
       tableDF.columns.map(columnName => { // for each column
 
         tableDF.select(tableDF(columnName)) // new DF with values from given column
@@ -50,20 +50,29 @@ object Sindy {
     }).reduce((tuplesTableA, tuplesTableB) => tuplesTableA.union(tuplesTableB)) // Merge DFs (from tables)
 
     // (2) Create attribute sets from cells
-    val attributeSets = cells
-      .groupBy(cells("column_value"))
-      .agg(collect_set("column_origin")).drop("column_value").as("attributeSet")
+    val attributeSetsDF = cellsDF
+      .groupBy(cellsDF("column_value"))
+      .agg(collect_set("column_origin")).drop("column_value")
 
     // (3) Create inclusion lists
     // Generate sets as follows: E.g [a,b] => [a, [b]], [b, [a]]
 
-    val inclusionLists = attributeSets.map(attributeSet => {
-      attributeSet.getAs[String]("column_origin").flatMap(
-        columnOrigin => { (columnOrigin, attributeSet)} )
-    }).show()
+    val inclusionListsDF = attributeSetsDF.as[Seq[String]].flatMap(attributeSet => {
+      attributeSet.map(attribute => (attribute, attributeSet.filter(_ != attribute)))
+    }).distinct().filter(row => row._2.nonEmpty)
+    inclusionListsDF.show()
+
+//    // Build inclusion list from attribute sets
+//    val inclusionLists = attributeSets.flatMap(inclusion => {
+//      // Generate set e.g [a,b] => [a, [b]], [b, [a]]
+//      inclusion.map(attribute => (attribute, inclusion.filter(_ != attribute)))
+//    }).filter(inclusion => inclusion._2.nonEmpty)
+//      .toDF("attribute", "attributeSet")
+//      .as[Inclusion]
 
 
-//    val inclusionLists = attributeSets.flatMap(attributeSet => {
+
+    //    val inclusionLists = attributeSets.flatMap(attributeSet => {
 //        inclusion.supersets.map(attribute => (attribute, inclusion.supersets.filter(_ != attribute)))
 //      }).as[Inclusion]
 //

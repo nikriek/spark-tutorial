@@ -53,8 +53,6 @@ object Sindy {
       .groupBy(cells.columns(0))
       .agg(collect_set(cells.columns(1)))
 
-    groupedAttributes.show(400)
-
     val attributeSets = groupedAttributes.select(groupedAttributes.columns(1)).as[AttributeSet]
 
     // Build inclusion list from attribute sets

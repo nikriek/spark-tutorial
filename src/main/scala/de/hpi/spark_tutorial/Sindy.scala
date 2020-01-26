@@ -70,7 +70,7 @@ object Sindy {
       .as[InclusionList]
       .map(inclusionList => (inclusionList.attribute, inclusionList.attributeSet.flatten.distinct))
       .toDF("attribute", "attributeSet")
-      .orderBy(org.apache.spark.sql.functions.col("attribute").desc)
+      .orderBy(org.apache.spark.sql.functions.col("attribute").asc)
       .as[Inclusion]
 
 

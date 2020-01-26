@@ -28,7 +28,6 @@ object Sindy {
     // List[String] => List[DataFrame]
     val dataframes = inputs.map(input => {
       spark.read
-        .option("inferSchema", "true")
         .option("header", "true")
         .option("quote", "\"")
         .option("delimiter", ";")
@@ -69,36 +68,14 @@ object Sindy {
       .agg(collect_set(inclusionLists.columns(1)))
       .toDF("attribute", "attributeSets")
       .as[InclusionList]
-      .filter(inclusionLists => {
-        !inclusionLists.attributeSets.exists(e => e.isEmpty)
-      })
       .map(inclusionList => (inclusionList.attribute, inclusionList.attributeSets.reduce((a,b) => a.intersect(b))))
       .toDF("attribute", "attributeSet")
       .as[Inclusion]
       .filter(inclusionList => inclusionList.attributeSet.nonEmpty)
+      .orderBy("attribute")
 
     // Print results in desired format
-    results.foreach(result => println(s"${result.attribute} < ${result.attributeSet.mkString(",")}"))
-
-    /*
-    C_CUSTKEY < P_PARTKEY
-    C_NATIONKEY < S_NATIONKEY, N_NATIONKEY
-    L_COMMIT < L_SHIP, L_RECEIPT
-    L_LINENUMBER < C_NATIONKEY, S_NATIONKEY, O_ORDERKEY, L_SUPPKEY, N_NATIONKEY, S_SUPPKEY, P_PARTKEY, P_SIZE, C_CUSTKEY, L_PARTKEY
-    L_LINESTATUS < O_ORDERSTATUS
-    L_ORDERKEY < O_ORDERKEY
-    L_PARTKEY < P_PARTKEY
-    L_SUPPKEY < P_PARTKEY, S_SUPPKEY, C_CUSTKEY
-    L_TAX < L_DISCOUNT
-    N_NATIONKEY < C_NATIONKEY, S_NATIONKEY
-    N_REGIONKEY < C_NATIONKEY, S_NATIONKEY, N_NATIONKEY, R_REGIONKEY
-    O_CUSTKEY < P_PARTKEY, C_CUSTKEY
-    O_SHIPPRIORITY < C_NATIONKEY, S_NATIONKEY, N_REGIONKEY, N_NATIONKEY, R_REGIONKEY
-    P_SIZE < L_SUPPKEY, S_SUPPKEY, P_PARTKEY, C_CUSTKEY, L_PARTKEY
-    R_REGIONKEY < C_NATIONKEY, S_NATIONKEY, N_REGIONKEY, N_NATIONKEY
-    S_NATIONKEY < C_NATIONKEY, N_NATIONKEY
-    S_SUPPKEY < L_SUPPKEY, P_PARTKEY, C_CUSTKEY
-     */
+    results.foreach(result => println(s"${result.attribute} < ${result.attributeSet.mkString(", ")}"))
   }
 }
 

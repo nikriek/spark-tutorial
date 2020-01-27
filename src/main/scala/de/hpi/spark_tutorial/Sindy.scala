@@ -1,10 +1,8 @@
 package de.hpi.spark_tutorial
 
-import org.apache.spark.sql.{Dataset, Row, SparkSession}
-import org.apache.spark.sql.functions.{collect_set, lit}
-import org.apache.spark.sql.types.ArrayType
+import org.apache.spark.sql.{SparkSession}
+import org.apache.spark.sql.functions.{collect_set, lit, col}
 
-import scala.collection.mutable
 
 object Sindy {
   val columnName = "attribute"
@@ -72,7 +70,11 @@ object Sindy {
       .toDF("attribute", "attributeSet")
       .as[Inclusion]
       .filter(inclusionList => inclusionList.attributeSet.nonEmpty)
-      .orderBy("attribute")
+      .orderBy(col("attribute").desc)
+
+    // TODO: Ordering in spark does not work
+    var r = results.coll
+
 
     // Print results in desired format
     results.foreach(result => println(s"${result.attribute} < ${result.attributeSet.mkString(", ")}"))
